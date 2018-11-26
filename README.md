@@ -223,8 +223,8 @@ babel-loader 官网的名称很明显： Webpack plugin for Babel
 
 现在运行 ./node_modules/.bin/webpack-dev-server --config ./webpack/webpack.web.js 看看效果
 
-![初始化react]()
+![初始化react](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step1-image2.png)
 
 再看看项目代码结构
 
-![初始化react-项目代码结构]()
+![初始化react-项目代码结构](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step1-image1.jpg)
