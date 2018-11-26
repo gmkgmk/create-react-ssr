@@ -9,17 +9,17 @@ react服务端渲染到现在阶段已经发展的很成熟了，生态圈的�
 
 ## 开始前介绍
 
- 任务之前我们需要列一下需要完成的几个点。
+**任务之前我们需要列一下需要完成的几个点。**
 
-1. 初始化项目。
+**一. 初始化项目。**
 
-2. 初始化一个 react 组建。
+**二. 初始化一个 react 组建。**
 
-3. 初始化一个服务器
+**三. 初始化一个服务器**
 
-4. 通过服务端渲染 react。
+**四. 通过服务端渲染 react。**
 
-### 1.初始化项目
+### 一.初始化项目
 
 首先快速初始化一个  空项目
 
@@ -31,7 +31,7 @@ react服务端渲染到现在阶段已经发展的很成熟了，生态圈的�
 
 进行初始化
 
-### 2.初始化一个 react 组建
+### 二.初始化一个 react 组建
 
 下载 react 依赖
 
@@ -43,7 +43,7 @@ react服务端渲染到现在阶段已经发展的很成熟了，生态圈的�
 
 现在在根目录下创建一个 web 文件夹，我们用来存放 web 端的代码
 
-1. 在 web 文件夹里面创建一个 index.js 作为程序的入口
+#### 1. 在 web 文件夹里面创建一个 index.js 作为程序的入口
 
 ```js
 import App from "./app.js";
@@ -59,7 +59,7 @@ reactDom.render(
 );
 ```
 
-2. 再创建一个 app.js 文件，作为程序的主要内容
+#### 2. 再创建一个 app.js 文件，作为程序的主要内容
 
 ```jsx
 import React from "react";
@@ -104,7 +104,7 @@ export default class extends React.Component {
 }
 ```
 
-3. 配置 webpack
+#### 3. 配置 webpack
 
 如果只是这样的话游览器是不认识 react 代码的，所以需要将它转换成浏览器可以认识的代码（比如 import class 等），这里又需要引入 babel, 将代码进行转化，
 
@@ -145,7 +145,10 @@ module.exports = {
 	},
 	plugins: [
 		new webpack.HotModuleReplacementPlugin(),
-		new webpack.NamedModulesPlugin()
+        new webpack.NamedModulesPlugin()，
+        new webpack.DefinePlugin({
+			__isService: false
+		})
 	],
 	devServer: {
 		contentBase: path.resolve(__dirname, "../web"), //对外提供的访问内容的路径
@@ -164,7 +167,7 @@ module.exports = {
 };
 ```
 
-4. 安装 babel 依赖
+#### 4. 安装 babel 依赖
 
 ```js
     npm install @babel/core @babel/preset-react babel-loader @babel/plugin-proposal-class-properties  @babel/preset-env @babel/polyfill
@@ -201,7 +204,7 @@ babel-loader 官网的名称很明显： Webpack plugin for Babel
 
 ```
 
-5. 最后需要一个页面，在 web 文件夹里存放一个页面
+#### 5. 最后需要一个页面，在 web 文件夹里存放一个页面
 
 有一个 id 为 root 的元素作为跟元素，
 
@@ -223,8 +226,128 @@ babel-loader 官网的名称很明显： Webpack plugin for Babel
 
 现在运行 ./node_modules/.bin/webpack-dev-server --config ./webpack/webpack.web.js 看看效果
 
+打开浏览器 http://localhost:8080
+
 ![初始化react](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step1-image2.png)
 
 再看看项目代码结构
 
 ![初始化react-项目代码结构](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step1-image1.jpg)
+
+### 三.初始化一个服务器
+
+我们选用 Koa 为基础搭建服务器,来搭建一个简单的服务器
+
+首先依然是下载依赖
+
+```js
+    npm install koa nodemon --save-dev
+```
+
+现在我们需要在有一个文件夹存放服务端的代码，在根目录下创建一个文件夹 server，创建一个文件 app.js (server/app.js)
+
+编写服务端的代码
+
+```js
+const koa  = require("koa");
+const app = new koa();
+const port = 3000;
+
+const serverSideRender = async ctx => {
+    ctx.body = {name:"hello world}
+};
+app.use(serverSideRender);
+app.listen(port, () => {});
+
+```
+
+然后在命令行输入
+
+```.bash
+node ./server/app.js
+```
+
+打开浏览器 http://localhost:3000
+
+![初始化服务器](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step2-image1.pngstep2-image1.jpg)
+
+到这一步服务器就搭建好了，但是这还远远不够，现在我们还需要做一些准备工作，来让我们后面更好的开发，因为 react 服务端渲染，那么肯定需要在服务端运行 react 代码，但是 node 不认识 import，jsx 这些代码，所以需要将这部分代码转换为 node 认识的代码。
+
+ 现在下载一个依赖，让 webpack 不捆绑它的 node_modules 依赖项（减少大小，只需要 require('module') 方式引入）
+
+```.bash
+    npm install webpack-node-externals --save
+```
+
+编写 webpack 配置
+
+```js
+const path = require("path");
+const nodeExternals = require("webpack-node-externals");
+const webpack = require("webpack");
+
+module.exports = {
+	mode: "development",
+	entry: [path.resolve(__dirname, "../server/app.js")],
+	target: "node",
+	externals: [nodeExternals()],
+	output: {
+		path: path.resolve(__dirname, "../dist"),
+		filename: "server.js"
+	},
+	module: {
+		rules: [
+			{
+				test: /\.js$/,
+				use: {
+					loader: "babel-loader"
+				}
+			}
+		]
+	},
+	plugins: [
+		new webpack.DefinePlugin({
+			__isService: true //用来区分是不是服务器端，后面会使用
+		})
+	]
+};
+```
+
+现在还需要修改一下 package 配置，否则一直通过命令行输入太麻烦
+
+```json
+{
+	"name": "demo",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"server": "webpack -w --config ./webpack/webpack.server.js & nodemon ./dist/server.js"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"devDependencies": {
+		"koa": "^2.6.2",
+		"nodemon": "^1.18.6",
+		"react": "^16.6.3",
+		"react-dom": "^16.6.3",
+		"react-router": "^4.3.1",
+		"react-router-dom": "^4.3.1",
+		"webpack": "^4.26.1",
+		"webpack-cli": "^3.1.2",
+		"webpack-dev-server": "^3.1.10"
+	},
+	"dependencies": {
+		"@babel/core": "^7.1.6",
+		"@babel/plugin-proposal-class-properties": "^7.1.0",
+		"@babel/polyfill": "^7.0.0",
+		"@babel/preset-env": "^7.1.6",
+		"@babel/preset-react": "^7.0.0",
+		"babel-loader": "^8.0.4",
+		"webpack-node-externals": "^1.7.2"
+	}
+}
+```
+
+准备的差不多了，下面我们就开始将两者融合在一起
