@@ -254,7 +254,7 @@ const app = new koa();
 const port = 3000;
 
 const serverSideRender = async ctx => {
-    ctx.body = {name:"hello world}
+    ctx.body = {name:"hello world"}
 };
 app.use(serverSideRender);
 app.listen(port, () => {});
@@ -269,7 +269,7 @@ node ./server/app.js
 
 打开浏览器 http://localhost:3000
 
-![初始化服务器](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step2-image1.pngstep2-image1.jpg)
+![初始化服务器](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step2-image1.jpg)
 
 到这一步服务器就搭建好了，但是这还远远不够，现在我们还需要做一些准备工作，来让我们后面更好的开发，因为 react 服务端渲染，那么肯定需要在服务端运行 react 代码，但是 node 不认识 import，jsx 这些代码，所以需要将这部分代码转换为 node 认识的代码。
 
