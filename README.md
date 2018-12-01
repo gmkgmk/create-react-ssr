@@ -813,4 +813,4 @@ export default router;
 
 最后附上一张网上大神总结的服务端渲染原理图，侵删
 
-![todo](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/main.jpg)
+![ssr](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/ssr.png)
