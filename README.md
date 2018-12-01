@@ -249,16 +249,15 @@ babel-loader 官网的名称很明显： Webpack plugin for Babel
 编写服务端的代码
 
 ```js
-const koa  = require("koa");
+const koa = require("koa");
 const app = new koa();
 const port = 3000;
 
 const serverSideRender = async ctx => {
-    ctx.body = {name:"hello world"}
+	ctx.body = { name: "hello world" };
 };
 app.use(serverSideRender);
 app.listen(port, () => {});
-
 ```
 
 然后在命令行输入
@@ -350,4 +349,468 @@ module.exports = {
 }
 ```
 
-准备的差不多了，下面我们就开始将两者融合在一起
+就此，服务器和 web 端已经能够正常跑起来了，现在我们尝试使用服务器进行渲染。
+
+## 通过服务器进行渲染
+
+首先我们需要对服务端进行改造
+
+-   react 服务端渲染，那么服务端肯定需要使用 react,所以我们需要首先引入 react 与 reactDom
+-   通过服务端返回 html 信息
+
+吧/server/app.js 改造如下
+
+```js
+const koa = require("koa");
+const app = new koa();
+const port = 3000;
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { StaticRouter, matchPath } from "react-router-dom";
+import App from "./../web/app";
+
+const createHtml = innerHtml => {
+	return `
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="UTF-8" />
+            <title>服务端渲染</title>
+        </head>
+        <body>
+            <div id="root">${innerHtml}</div>
+        </body>
+    </html>`;
+};
+
+const serverSideRender = async ctx => {
+	const markUp = renderToString(
+		<StaticRouter location={ctx.url} context={{}}>
+			<App />
+		</StaticRouter>
+	);
+	ctx.body = createHtml(markUp);
+};
+app.use(serverSideRender);
+app.listen(port, () => {});
+```
+
+**renderToString 和 StaticRouter 方法分别是 reactDom 和 reactRouter 的 api,官方的文档很全面，可以先去了解一下**
+
+打开 localhost:3000 可以看到，现在浏览器已经可以通过服务端渲染出 react 内容了
+
+![服务器渲染react](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step3-image1.jpg)
+
+但是现在还不够哦，现在只是传输静态页面，而且服务端渲染后，前端没有再次渲染，管理权一直在服务器这边，每次都会向服务器发送请求。
+
+我们先通过服务器请求一些数据.需要在服务端请求数据，所以我们引入一个方法库，能够在服务端使用 fetch.
+
+```js
+ npm install node-fetch --save-dev
+```
+
+然后在创建一个文件夹来管理请求数据
+
+我在 web 文件夹内创建/service/home.js 里添加一些内容；
+
+```js
+import fetch from "node-fetch";
+
+export function query() {
+	return fetch("https://jsonplaceholder.typicode.com/posts")
+		.then(res => res.json())
+		.then(data => data)
+		.catch(err =>
+}
+```
+
+然后再次改造服务端,获取数据后将数据依附到 window 上，传向 web 端，（后面 web 端也会请求一次数据，渲染）
+
+```js
+const koa = require("koa");
+const app = new koa();
+const port = 3000;
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { StaticRouter, matchPath } from "react-router-dom";
+import App from "./../web/app";
+import { query } from "../../ssr/web/services/home";
+const createHtml = (innerHtml, data) => {
+	return `
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="UTF-8" />
+            <title>服务端渲染</title>
+        </head>
+        <body>
+            <div id="root">${innerHtml}</div>
+            <script>window.INITIAL_DATA = ${JSON.stringify(data)}</script>
+        </body>
+    </html>`;
+};
+
+const fetchData = async () => {
+	return await query();
+};
+
+const serverSideRender = async ctx => {
+	const data = await fetchData();
+	const markUp = renderToString(
+		<StaticRouter location={ctx.url} context={{}}>
+			<App />
+		</StaticRouter>
+	);
+	ctx.body = createHtml(markUp, data);
+};
+app.use(serverSideRender);
+app.listen(port, () => {});
+```
+
+打开浏览器：3000 已经可以看到数据了
+
+![服务器渲染react,获取数据](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step3-image2.jpg)
+
+让我们暂时将关注点转回 web 端。
+
+由于不同页面进入的数据肯定是不同的，所以我们需要将路由信息，改造一下。
+
+独立一个 router 配置 /route/index.js （这里只是一个简单的列子，吧页面也放入这个文件，真实项目需要根据自己的修改）
+
+```js
+/**
+ * import page;
+ * 引入react组建
+ */
+import React from "react";
+class Home extends React.Component {
+	state = {
+		data: []
+	};
+	constructor(props) {
+		super(props);
+	}
+	componentDidMount() {
+		this.fetchData();
+	}
+	fetchData = async () => {
+		const result = await this.props.loadData();
+		this.setState({
+			data: [result]
+		});
+	};
+	render() {
+		// 获取数据时同归promiseAll获取，返回的是一个元祖
+		const [data] = this.state.data;
+		return (
+			<div>
+				<div>主页</div>
+				{data &&
+					data.map(item => {
+						return (
+							<ol
+								key={item.id}
+								style={{ border: "1px solid #555" }}
+							>
+								<li>id:{item.id}</li>
+								<li>标题:{item.title}</li>
+								<li>用户id:{item.userId}</li>
+								<li>内容:{item.body}</li>
+							</ol>
+						);
+					})}
+			</div>
+		);
+	}
+}
+
+class Todo extends React.Component {
+	render() {
+		return <div>todo</div>;
+	}
+}
+
+import { query } from "./../web/service/home";
+const router = [
+	{ path: "/todo", component: Todo },
+	{
+		path: "/home",
+		component: Home,
+		loadData: async () => {
+			return query();
+		}
+	}
+];
+
+export default router;
+```
+
+相应的主页也需要进行修改 /web/app.js
+
+```js
+import React from "react";
+import { Route, Switch, Link, Redirect } from "react-router-dom";
+import routes from "../route";
+
+export default function() {
+	return (
+		<>
+			<header>
+				<nav>
+					<li>
+						<Link to="/todo">todo</Link>
+					</li>
+					<li>
+						<Link to="/home">home</Link>
+					</li>
+				</nav>
+			</header>
+			<section>
+				<Switch>
+					{routes.map(({ path, component: Com, ...rest }) => (
+						<Route
+							path={path}
+							render={props => <Com {...props} {...rest} />}
+							key={path}
+						/>
+					))}
+					<Route
+						exact
+						path="/"
+						render={() => <Redirect to="/home" />}
+					/>
+				</Switch>
+			</section>
+		</>
+	);
+}
+```
+
+**<Com {...props} {...rest}/>}** 在这里我们将 route 里的配置都传给组建
+
+打开浏览器 8080 端口，这就是一个标准的 react 请求渲染。
+
+现在需要做一些不同的东西。
+
+修改一下入口文件。 /web/index.js
+
+```js
+import App from "./app.js";
+import React from "react";
+import { hydrate } from "react-dom";
+import { BrowserRouter as Router } from "react-router-dom";
+
+hydrate(
+	<Router>
+		<App />
+	</Router>,
+	document.getElementById("root")
+);
+```
+
+将 render 改为 hydrate
+
+现在再打开会发现一个报错，但是先忽略，这是因为用了服务端渲染的方法，但是却是通过 web 端进行渲染
+
+现在修改一下 web 端的 webpack 配置，因为是服务端渲染，所以不需要 webpack-dev-server
+
+```js
+const path = require("path");
+const webpack = require("webpack");
+
+module.exports = {
+	mode: "development",
+	entry: [path.resolve(__dirname, "../web")],
+	output: {
+		path: path.resolve(__dirname, "../public")
+	},
+	module: {
+		rules: [
+			{
+				test: /\.js$/,
+				use: {
+					loader: "babel-loader"
+				}
+			}
+		]
+	},
+	plugins: [
+		new webpack.HotModuleReplacementPlugin(),
+		new webpack.NamedModulesPlugin(),
+		new webpack.DefinePlugin({
+			__isService: false
+		})
+	]
+};
+```
+
+在 package.json 里配置一下
+
+```json
+"scripts": {
+    "web":"webpack -w --config ./webpack/webpack.web.js",
+    "server": "webpack -w --config ./webpack/webpack.server.js & nodemon ./dist/server.js"
+  },
+```
+
+然后 npm run web 进行打包
+
+现在，我们回到服务端。
+
+我们需要对比当前访问的路由和路由配置里的是否相同，然后来调用不同的请求，再将数据传到 web 端，并通过页面读取刚才打包的 web 端 js 文件
+
+下载 koa-static 让我们能够访问刚才打包的文件夹
+
+```
+npm install koa-static --save-dev
+```
+
+修改/server/app.js
+
+```js
+const koa = require("koa");
+const app = new koa();
+const port = 3000;
+import React from "react";
+import { renderToString } from "react-dom/server";
+import { StaticRouter, matchPath } from "react-router-dom";
+import App from "./../web/app";
+import Routes from "./../route";
+import koaStatic from "koa-static";
+
+app.use(koaStatic("public"));
+
+const createHtml = (innerHtml, data) => {
+	return `
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <meta charset="UTF-8" />
+            <title>服务端渲染</title>
+            <script src="/main.js" defer></script>
+        </head>
+        <body>
+            <div id="root">${innerHtml}</div>
+            <script>window.INITIAL_DATA = ${JSON.stringify(data)}</script>
+        </body>
+    </html>`;
+};
+
+// 匹配路由
+const findRoute = async url => {
+	const promises = [];
+
+	Routes.some(route => {
+		const match = matchPath(url, route.path);
+		if (match && route.loadData) promises.push(route.loadData(match));
+		return;
+	});
+
+	const data = await Promise.all(promises);
+	return data;
+};
+const serverSideRender = async ctx => {
+	const data = await findRoute(ctx.url);
+	const markUp = renderToString(
+		<StaticRouter location={ctx.url} context={{ data: data }}>
+			<App />
+		</StaticRouter>
+	);
+	ctx.body = createHtml(markUp, data);
+};
+app.use(serverSideRender);
+app.listen(port, () => {});
+```
+
+现在打开浏览器：3000
+
+可以看到数据返回到 web 端，但是 web 端依然会请求一次数据
+
+最后我们需要修改 web 端组件：
+
+```js
+/**
+ * import page;
+ * 引入react组建
+ */
+import React from "react";
+class Home extends React.Component {
+	state = {
+		data: __isService ? this.props.staticContext.data : window.INITIAL_DATA
+	};
+	constructor(props) {
+		super(props);
+	}
+	componentDidMount() {
+		if (!__isService) {
+			this.fetchData();
+		}
+	}
+	fetchData = async () => {
+		const result = await this.props.loadData();
+		this.setState({
+			data: [result]
+		});
+	};
+	render() {
+		// 获取数据时同归promiseAll获取，返回的是一个元祖
+		const [data] = this.state.data;
+		return (
+			<div>
+				<div>主页</div>
+				{data &&
+					data.map(item => {
+						return (
+							<ol
+								key={item.id}
+								style={{ border: "1px solid #555" }}
+							>
+								<li>id:{item.id}</li>
+								<li>标题:{item.title}</li>
+								<li>用户id:{item.userId}</li>
+								<li>内容:{item.body}</li>
+							</ol>
+						);
+					})}
+			</div>
+		);
+	}
+}
+
+class Todo extends React.Component {
+	render() {
+		return <div>todo</div>;
+	}
+}
+
+import { query } from "./../web/service/home";
+const router = [
+	{ path: "/todo", component: Todo },
+	{
+		path: "/home",
+		component: Home,
+		loadData: async () => {
+			return query();
+		}
+	}
+];
+
+export default router;
+```
+
+看看最终的效果
+
+从home进入
+
+![home](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step3-image3.jpg)
+
+从todo进入
+![todo](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/step3-image4.jpg)
+
+
+因为最近比较忙，可能总结的不是很到位，如果有什么不清楚的，可以加我微信一起交流技术：
+微信号: G-Goodwin
+
+最后附上一张网上大神总结的服务端渲染原理图，侵删
+
+![todo](https://github.com/gmkgmk/create-react-ssr/blob/master/_img/main.jpg)

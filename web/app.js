@@ -1,22 +1,11 @@
 import React from "react";
 import { Route, Switch, Link, Redirect } from "react-router-dom";
+import routes from "../route";
 
-class Home extends React.Component {
-	render() {
-		return <div>主页</div>;
-	}
-}
-
-class Todo extends React.Component {
-	render() {
-		return <div>todo</div>;
-	}
-}
-
-export default class extends React.Component {
-	render() {
-		return (
-			<div>
+export default function() {
+	return (
+		<>
+			<header>
 				<nav>
 					<li>
 						<Link to="/todo">todo</Link>
@@ -25,16 +14,23 @@ export default class extends React.Component {
 						<Link to="/home">home</Link>
 					</li>
 				</nav>
+			</header>
+			<section>
 				<Switch>
-					<Route path="/todo" render={() => <Todo />} />
-					<Route path="/home" render={() => <Home />} />
+					{routes.map(({ path, component: Com, ...rest }) => (
+						<Route
+							path={path}
+							render={props => <Com {...props} {...rest} />}
+							key={path}
+						/>
+					))}
 					<Route
 						exact
 						path="/"
 						render={() => <Redirect to="/home" />}
 					/>
 				</Switch>
-			</div>
-		);
-	}
+			</section>
+		</>
+	);
 }

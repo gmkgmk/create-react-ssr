@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "web": "webpack -w --config ./webpack/webpack.web.js",
     "server": "webpack -w --config ./webpack/webpack.server.js & nodemon ./dist/server.js"
   },
   "keywords": [],
@@ -11,6 +12,8 @@
   "license": "ISC",
   "devDependencies": {
     "koa": "^2.6.2",
+    "koa-static": "^5.0.0",
+    "node-fetch": "^2.3.0",
     "nodemon": "^1.18.6",
     "react": "^16.6.3",
     "react-dom": "^16.6.3",
